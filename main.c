@@ -63,21 +63,77 @@ int main(int argc, char** argv)
         exit(EXIT_FAILURE);
     }
 
+    int i;
+    int fd;
+    int fdmax = sfd;
+    fd_set cache;
+    fd_set work;
     struct sockaddr_storage client;
     socklen_t addr_size = sizeof(client);
     int cs;
-    if(-1 == (cs = accept(sfd, (struct sockaddr*) &client, &addr_size)))
+    int bytes;
+    char buf[1024];
+
+    FD_ZERO(&cache);
+    FD_SET(sfd, &cache);
+
+    while(1)
     {
-        perror("accept");
-        exit(EXIT_FAILURE);
+        work = cache;
+        status = select(fdmax + 1, &work, NULL, NULL, NULL);
+        if(status)
+        {
+            for(i = 3; i <= fdmax; ++i)
+            {
+                if(FD_ISSET(i, &work))
+                {
+                    if(i != sfd)
+                    {
+                        if(0 < (bytes = recv(i, (void*) buf, 512, 0)))
+                        {
+                            printf("from %d:\n\t%s\n", i, buf);
+                            const char* msg = "HTTP/1.0 200 OK\nContent-type: text/html\n\n<H1>Success!</H1>";
+                            send(i, (void *) msg, 57, 0);
+                            close(i);
+                            FD_CLR(i, &cache);
+                        }
+                        else
+                        {
+                            if(bytes == 0)
+                            {
+                                printf("socket %d hung up\n", i);
+                            }
+                            else
+                            {
+                                perror("recv()");
+                            }
+                            close(i);
+                            FD_CLR(i, &cache);
+                        }
+                    }
+                    else
+                    {
+                        addr_size = sizeof(client);
+                        if(-1 != (cs = accept(sfd, (struct sockaddr*) &client, &addr_size)))
+                        {
+                            FD_SET(cs, &cache);
+                            fdmax = (cs > fdmax) ? cs : fdmax;
+                            printf("new client: %d\n", cs);
+                        }
+                        else
+                        {
+                            perror("accept()");
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            perror("select()");
+            break;
+        }
     }
-
-    const char* msg =
-        "HTTP/1.0 200 OK\nContent-type: text/html\n\n<H1>Success!</H1>";
-    send(cs, (void *) msg, 57, 0);
-
-    close(cs);
-    close(sfd);
 
     return EXIT_SUCCESS;
 }
