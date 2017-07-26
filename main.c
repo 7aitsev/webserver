@@ -66,7 +66,7 @@ int main(int argc, char** argv)
     }
 
     int i;
-    int fd;
+    //int fd;
     int fdmax = sfd;
     fd_set cache;
     fd_set work;
@@ -78,8 +78,7 @@ int main(int argc, char** argv)
 
     FD_ZERO(&cache);
     FD_SET(sfd, &cache);
-    
-    prepareRegex();
+ 
     while(1)
     {
         work = cache;
@@ -94,10 +93,15 @@ int main(int argc, char** argv)
                     {
                         if(0 < (bytes = recv(i, (void*) buf, 512, 0)))
                         {
-                            parseReq(buf, bytes);
+                            char* msg_to_send;
+                            size_t msg_size;
+                            make_response(buf, msg_to_send, &msg_size);
+                            //send(i, (void*) msg_to_send, msg_size);
+                            //close(i);
+                            //FD_CLR(i, &cache);
                             printf("from %d:\n\t%s\n", i, buf);
                             const char* msg = "HTTP/1.0 200 OK\nContent-type: text/html\n\n<H1>Success!</H1>";
-                            send(i, (void *) msg, 57, 0);
+                            send(i, (void *) msg, 63, 0);
                             close(i);
                             FD_CLR(i, &cache);
                         }
@@ -138,7 +142,6 @@ int main(int argc, char** argv)
             break;
         }
     }
-    finishRegex();
 
     return EXIT_SUCCESS;
 }
