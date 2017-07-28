@@ -27,6 +27,28 @@ print_http_req(const struct HTTP_REQ* http_req)
           );
 }
 
+int sendall(int sfd, const char* data, size_t* dsize)
+{
+    int total = 0;
+    int bytesleft = *dsize;
+    int n;
+
+    while(total < *dsize)
+    {
+        n = send(sfd, data+total, bytesleft, 0);
+        if(-1 == n)
+        {
+            break;
+        }
+        total += n;
+        bytesleft -= n;
+    }
+
+    *dsize = total;
+
+    return n == -1 ? -1 : 0;
+}
+
 int
 fill_http_req(struct HTTP_REQ* http_req, const char* method, char* uri, char v1, char v2)
 {
@@ -107,34 +129,76 @@ parse_http_req(struct HTTP_REQ* http_req, const char* req)
 }
 
 void
-do_http_get(const struct HTTP_REQ* http_req, char* presp, size_t* psize)
+do_http_get(int sfd, struct HTTP_REQ* http_req)
 {
-    FILE* file = fopen(http_req->uri, "r");
+    const size_t rsize = 512;
+    size_t ssize;
+    char buf[rsize];
+    int n;
+    int fd;
 
-
-}
-
-void
-do_http_req(struct HTTP_REQ* http_req, char* presp, size_t* psize)
-{
-    switch(http_req->method)
+    char* path = strcmp(http_req->uri, "/") ? http_req->uri : "/index.html";
+    if(-1 == (fd = open(path, O_RDONLY)))
     {
-        case GET:
-            do_http_get(http_req, presp, psize);
-            break;
-        default:
-            http_req->status = NOT_IMPLEMENTED;
+        http_req->status = (EACCES == errno) ? FORBIDDDEN : NOT_FOUND;
+        return;
+    }
+
+    while(0 != (n = read(fd, buf, rsize)))
+    {
+        if(n != -1)
+        {
+            ssize = n;
+            if(-1 == sendall(sfd, buf, &ssize))
+            {
+                fprintf(stderr, "%d: exp %d, sent %ld\n", sfd, n, rsize);
+            }
+        }
+        else
+        {
+            perror("read()"); // Internal Server Error
+            return;
+        }
     }
 }
 
 void
-error_http(const struct HTTP_REQ* http_req, char* presp, size_t* psize)
+do_http_req(int sfd, struct HTTP_REQ* http_req)
 {
+    switch(http_req->method)
+    {
+        case GET:
+            do_http_get(sfd, http_req);
+            break;
+        default:
+            http_req->status = NOT_IMPLEMENTED;
+    }
+    if(OK != http_req->status)
+    {
+        error_http(sfd, http_req);
+    }
+}
+
+void
+error_http(int sfd, const struct HTTP_REQ* http_req)
+{
+    char resp[400];
+    sprintf(resp, "HTTP/%s %d %s\r\nContent-Type: text/html\r\n\r\n<H1>%d: %s</H1>",
+            HTTP_VERSION_STRING[http_req->version],
+            HTTP_STATUS_ALL[http_req->status].st,
+            HTTP_STATUS_ALL[http_req->status].str,
+            HTTP_STATUS_ALL[http_req->status].st,
+            HTTP_STATUS_ALL[http_req->status].str);
+    size_t size = strlen(resp);
+    sendall(sfd, resp, &size);
     switch(http_req->status)
     {
         case OK:
             break;
         case BAD_REQUEST:
+            break;
+        case NOT_FOUND:
+
             break;
         case INTERNAL_ERROR:
             break;
@@ -147,18 +211,18 @@ error_http(const struct HTTP_REQ* http_req, char* presp, size_t* psize)
 }
 
 void
-make_response(const char* data, char* presp, size_t* psize)
+make_response(int sfd, const char* data)
 {
     struct HTTP_REQ http_req;
     parse_http_req(&http_req, data);
     
     if(OK == http_req.status)
     {
-        do_http_req(&http_req, presp, psize);
+        do_http_req(sfd, &http_req);
         free(http_req.uri);
     }
     else
     {
-        error_http(&http_req, presp, psize);
+        error_http(sfd, &http_req);
     }
 }

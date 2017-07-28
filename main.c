@@ -65,6 +65,8 @@ int main(int argc, char** argv)
         exit(EXIT_FAILURE);
     }
 
+    chroot("/home/max/Documents/.do/webserver");
+
     int i;
     //int fd;
     int fdmax = sfd;
@@ -93,15 +95,13 @@ int main(int argc, char** argv)
                     {
                         if(0 < (bytes = recv(i, (void*) buf, 512, 0)))
                         {
-                            char* msg_to_send;
-                            size_t msg_size;
-                            make_response(buf, msg_to_send, &msg_size);
+                            make_response(i, buf);
                             //send(i, (void*) msg_to_send, msg_size);
                             //close(i);
                             //FD_CLR(i, &cache);
-                            printf("from %d:\n\t%s\n", i, buf);
-                            const char* msg = "HTTP/1.0 200 OK\nContent-type: text/html\n\n<H1>Success!</H1>";
-                            send(i, (void *) msg, 63, 0);
+                            //printf("from %d:\n\t%s\n", i, buf);
+                            //const char* msg = "HTTP/1.0 200 OK\nContent-type: text/html\n\n<H1>Success!</H1>";
+                            //send(i, (void *) msg, 63, 0);
                             close(i);
                             FD_CLR(i, &cache);
                         }
