@@ -14,23 +14,21 @@
 
 #include <unistd.h>
 
+#define DEF_URI "/index.html"
+#define URI_SIZE 256
+
 enum HTTP_METHOD {
     GET, POST, PUT, DELETE, CONNECT, PATCH, OPTIONS, TRACE, HEAD
 };
 
 enum HTTP_STATUS {
-    OK,
-    BAD_REQUEST,
-    FORBIDDDEN,
-    NOT_FOUND,
-    INTERNAL_ERROR,
-    NOT_IMPLEMENTED,
-    HTTP_VER
-};
-
-struct http_status_object {
-    unsigned short int st;
-    char str[30];
+    OK = 0,
+    BAD_REQUEST = 2,
+    FORBIDDDEN = 4,
+    NOT_FOUND = 6,
+    INTERNAL_ERROR = 8,
+    NOT_IMPLEMENTED = 10,
+    HTTP_VER = 12
 };
 
 enum HTTP_VERSION { V10, V11, V20 };
@@ -38,29 +36,26 @@ enum HTTP_VERSION { V10, V11, V20 };
 struct HTTP_REQ
 {
     enum HTTP_METHOD method;
-    char* uri;
+    char uri[URI_SIZE];
     enum HTTP_VERSION version;
     enum HTTP_STATUS status;
-};
-
-struct HTTP_RESP
-{
-    enum HTTP_VERSION version;
-    enum HTTP_STATUS status;
-    char* payload;
-    size_t pl_siz;
 };
 
 // network i/o
 int sendall(int sfd, const char* data, size_t* dsize);
 
+int isstrin(const char* str, const char * const set[], size_t latest_el);
+
+size_t
+put_http_header(char* buf, const struct HTTP_REQ* http_req,
+                const char* path);
 
 void
 print_http_req(const struct HTTP_REQ* http_req);
 int
 fill_http_req(struct HTTP_REQ* http_req,
               const char* method, char* uri, char v1, char v2);
-void
+int
 parse_http_req(struct HTTP_REQ* http_req, const char* req);
 
 void

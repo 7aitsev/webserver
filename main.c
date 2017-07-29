@@ -93,7 +93,7 @@ int main(int argc, char** argv)
                 {
                     if(i != sfd)
                     {
-                        if(0 < (bytes = recv(i, (void*) buf, 512, 0)))
+                        if(0 < (bytes = recv(i, (void*) buf, 1024, 0)))
                         {
                             make_response(i, buf);
                             //send(i, (void*) msg_to_send, msg_size);
