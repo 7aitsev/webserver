@@ -5,7 +5,7 @@ const char * const HTTP_METHOD_STRING[] = {
     "PATCH", "OPTIONS", "TRACE", "HEAD"
 };
 const char * const HTTP_VERSION_STRING[] = {
-    "1.0", "1.1", "2.0"
+    "1.0", "1.1"
 };
 const char * const HTTP_STATUS_ALL[] = {
     "200", "OK",
@@ -123,8 +123,8 @@ fill_http_req(struct HTTP_REQ* http_req, const char* method,
         return -1;
     }
 
-    char version[] = {v1, '.', v2, '\0'};
-    if(-1 == (http_version = isstrin(version, HTTP_VERSION_STRING, V20)))
+    const char version[] = {v1, '.', v2, '\0'};
+    if(-1 == (http_version = isstrin(version, HTTP_VERSION_STRING, V11)))
     {
         http_req->status = HTTP_VER;
         return -1;
@@ -149,15 +149,14 @@ fill_http_req(struct HTTP_REQ* http_req, const char* method,
 int
 parse_http_req(struct HTTP_REQ* http_req, const char* req)
 {
-    char method[8];
+    char method[9];
     char* uri = NULL;
     char v1 = 0;
     char v2 = 0;
 
+    int n;
     const char* fstr = "%8[A-Z] %m[-A-Za-z0-9./_] HTTP/%c.%c";
-    int n = sscanf(req, fstr, &method, &uri, &v1, &v2);
-
-    if(4 == n)
+    if(4 == (n = sscanf(req, fstr, &method, &uri, &v1, &v2)))
     {
         return fill_http_req(http_req, method, uri, v1, v2);
     }
@@ -187,32 +186,46 @@ parse_http_req(struct HTTP_REQ* http_req, const char* req)
 void
 do_http_get(int sfd, struct HTTP_REQ* http_req)
 {
-    const size_t rsize = 512;
+    char buf[DEF_BUF_SIZE];
     size_t ssize;
-    char buf[rsize];
-    int n;
     int fd;
+    int n;
 
     char* path = strcmp(http_req->uri, "/") ? http_req->uri : DEF_URI;
-    if(-1 == (fd = open(path, O_RDONLY)))
+    fd = open(path, O_RDONLY);
+    if(-1 != fd)
     {
-        http_req->status = (EACCES == errno) ? FORBIDDDEN : NOT_FOUND;
-        return;
+        http_req->status = OK;
     }
-
-    http_req->status = OK;
+    else
+    {
+        switch(errno)
+        {
+            case EACCES:
+                http_req->status = FORBIDDDEN;
+                return;
+            default:
+                http_req->status = NOT_FOUND;
+                return;
+        }
+    }
+    
     size_t h = put_http_header(buf, http_req, path);
 
-    while(0 != (n = read(fd, buf + h, rsize - h)))
+    while(0 != (n = read(fd, buf + h, DEF_BUF_SIZE - h)))
     {
         if(n != -1)
         {
             ssize = n + h;
-            if(-1 == sendall(sfd, buf, &ssize))
+            if(-1 != sendall(sfd, buf, &ssize))
             {
-                fprintf(stderr, "%d: exp %d, sent %ld\n", sfd, n, rsize);
+                h = 0;
             }
-            h = 0;
+            else
+            {
+                fprintf(stderr, "%d: exp %ld, sent %ld\n", sfd, n + h, ssize);
+                break;
+            }
         }
         else
         {
@@ -251,8 +264,9 @@ error_http(int sfd, const struct HTTP_REQ* http_req)
     size = put_http_header(resp, http_req, NULL);
 
     sprintf(resp + size,
-            "<html><title>%s</title><body><html><h2>%s: %s</h2></html>",
+            "<html><title>%s %s</title><body><html><h2>%s: %s</h2></html>",
             HTTP_STATUS_ALL[http_req->status],
+            HTTP_STATUS_ALL[http_req->status + 1],
             HTTP_STATUS_ALL[http_req->status],
             HTTP_STATUS_ALL[http_req->status + 1]);
     size = strlen(resp);

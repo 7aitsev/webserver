@@ -15,6 +15,7 @@
 #include <unistd.h>
 
 #define DEF_URI "/index.html"
+#define DEF_BUF_SIZE 512
 #define URI_SIZE 256
 
 enum HTTP_METHOD {
@@ -31,7 +32,7 @@ enum HTTP_STATUS {
     HTTP_VER = 12
 };
 
-enum HTTP_VERSION { V10, V11, V20 };
+enum HTTP_VERSION { V10, V11 };
 
 struct HTTP_REQ
 {
@@ -47,11 +48,15 @@ int sendall(int sfd, const char* data, size_t* dsize);
 int isstrin(const char* str, const char * const set[], size_t latest_el);
 
 size_t
+content_type(const char *path);
+
+size_t
 put_http_header(char* buf, const struct HTTP_REQ* http_req,
                 const char* path);
 
 void
 print_http_req(const struct HTTP_REQ* http_req);
+
 int
 fill_http_req(struct HTTP_REQ* http_req,
               const char* method, char* uri, char v1, char v2);
