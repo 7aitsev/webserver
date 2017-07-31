@@ -2,11 +2,31 @@
 
 struct config CONFIG;
 
-int
-config(int argc, char** argv)
+void
+printhelp()
 {
+    printf(
+        "WebServer %s\n\n"
+        "Usage: webserver [arguments] [document_root]\n"
+        "       start the server in a specified root directory.\n\n"
+        "Arguments:\n"
+        "--directory-index [-i] : Set a home page path (default is `%s`)\n"
+        "--help [-h]            : Print help (this message) and exit\n"
+        "--version [-v]         : Print version information and exit\n",
+        WEB_SERVER_VERSION,
+        DIRECTORY_INDEX
+    );
+}
+
+int
+init_server(int argc, char** argv)
+{
+    CONFIG.directory_index = NULL;
+    CONFIG.document_root = NULL;
+
     const struct option lopts[] = {
         {"index-page", optional_argument, NULL, 'i'},
+        {"help", no_argument, NULL, 'h'},
         {"version", no_argument, NULL, 'v'}
     };
 
@@ -17,32 +37,35 @@ config(int argc, char** argv)
         switch(opt)
         {
             case 'i':
-                printf("index = %s\n", optarg);
+                CONFIG.directory_index = optarg;
                 break;
             case 'v':
                 printf("WebServer %s\n", WEB_SERVER_VERSION);
                 return -1;
+            case 'h':
             default: // '?'
-                printf(
-"WebServer %s\n\n"
-"Usage: webserver [arguments] [document_root]\n"
-"       start the server in a specified root directory.\n\n"
-"Arguments:\n"
-"--directory-index [-i] : Set default home page path\n"
-"--version [-v]         : Print version information and exit\n",
-                        WEB_SERVER_VERSION
-                    );
+                printhelp();
                 return -1;
         }
     }
 
     if(optind < argc)
     {
-        while(optind < argc) {
-            printf("args: %s\n", argv[optind++]);
-        }
-//        CONFIG.document_root = argv[opt_idx++];
-//        printf("document_root = %s\n", CONFIG.document_root);
+        CONFIG.document_root = argv[optind++];
+    }
+
+    if(NULL == CONFIG.directory_index)
+    {
+        CONFIG.directory_index = DIRECTORY_INDEX;
+    }
+
+    if(NULL == CONFIG.document_root)
+    {
+        fprintf(
+            stderr,
+            "You have to specify the document_root parameter!\n"
+            );
+        return -1;
     }
 
     return 0;

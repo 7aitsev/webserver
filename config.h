@@ -5,6 +5,7 @@
 #include <getopt.h>
 
 #define WEB_SERVER_VERSION "0.9"
+#define DIRECTORY_INDEX "/index.html" 
 
 struct config
 {
@@ -14,7 +15,10 @@ struct config
 
 extern struct config CONFIG;
 
+void
+printhelp();
+
 int
-config(int argc, char** argv);
+init_server(int argc, char** argv);
 
 #endif

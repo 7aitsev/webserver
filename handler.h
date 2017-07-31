@@ -11,10 +11,10 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
-
 #include <unistd.h>
 
-#define DEF_URI "/index.html"
+#include "config.h"
+
 #define DEF_BUF_SIZE 512
 #define URI_SIZE 256
 

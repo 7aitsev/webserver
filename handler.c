@@ -191,7 +191,9 @@ do_http_get(int sfd, struct HTTP_REQ* http_req)
     int fd;
     int n;
 
-    char* path = strcmp(http_req->uri, "/") ? http_req->uri : DEF_URI;
+    char* path = strcmp(http_req->uri, "/")
+            ? http_req->uri
+            : CONFIG.directory_index;
     fd = open(path, O_RDONLY);
     if(-1 != fd)
     {

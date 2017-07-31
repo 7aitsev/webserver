@@ -1,12 +1,22 @@
+CC = gcc
+CFLAGS = -Wall -c
+
 .PHONY: all, clean
 
-all: main.c handler server
-	gcc main.c handler.o server.o -Wall -g -o webserver
+all: main config handler server
+	$(CC) main.o config.o handler.o server.o -Wall -o webserver
 
-server: server.h server.c
-	gcc server.c -c -Wall -g -o server.o
+main: main.c
+	$(CC) main.c $(CFLAGS) -o main.o
+
+config: config.h config.c
+	$(CC) config.c $(CFLAGS) -o config.o
+
+server: server.h server.c config
+	$(CC) server.c $(CFLAGS) -o server.o
+
 handler: handler.h handler.c
-	gcc handler.c -c -Wall -g -o handler.o
+	$(CC) handler.c $(CFLAGS) -o handler.o
 
 clean:
-	-rm handler.o server.o webserver 2>/dev/null
+	-rm handler.o server.o config.o main.o webserver 2>/dev/null

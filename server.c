@@ -11,8 +11,8 @@
 
 #define BACKLOG_SIZE 3
 
-void
-server()
+int
+prepare_server()
 {
     int status;
     struct addrinfo hints;
@@ -67,10 +67,14 @@ server()
         exit(EXIT_FAILURE);
     }
 
-    chroot("/home/max/Documents/.do/webserver");
+    return sfd;
+}
 
+int
+run_server(int sfd)
+{
     int i;
-    //int fd;
+    int status;
     int fdmax = sfd;
     fd_set cache;
     fd_set work;
@@ -138,4 +142,6 @@ server()
             break;
         }
     }
+    
+    return 0;
 }
