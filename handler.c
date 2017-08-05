@@ -206,7 +206,7 @@ do_http_get(int sfd, struct HTTP_REQ* http_req)
             case EACCES:
                 http_req->status = FORBIDDDEN;
                 return;
-            default:
+            default: // ENOENT
                 http_req->status = NOT_FOUND;
                 return;
         }

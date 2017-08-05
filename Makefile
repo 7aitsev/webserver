@@ -18,5 +18,8 @@ server: server.h server.c config
 handler: handler.h handler.c
 	$(CC) handler.c $(CFLAGS) -o handler.o
 
-clean:
-	-rm handler.o server.o config.o main.o webserver 2>/dev/null
+cleanup:
+	-rm main.o config.o handler.o server.o
+
+clean: cleanup
+	-rm webserver 2>/dev/null

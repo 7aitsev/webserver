@@ -11,6 +11,8 @@ struct config
 {
     char* directory_index;
     char* document_root;
+    char* user;
+    char* group;
 };
 
 extern struct config CONFIG;

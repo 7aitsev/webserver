@@ -1,4 +1,5 @@
 #include <string.h> // for memset
+#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -10,6 +11,28 @@
 #include "server.h"
 
 #define BACKLOG_SIZE 3
+
+volatile sig_atomic_t is_reload_needed = 0;
+
+void
+reload_config(int sig)
+{
+    is_reload_needed = 1;
+}
+
+void
+setup_ipc()
+{
+    struct sigaction sa;
+    sa.sa_handler = reload_config;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    if(-1 == sigaction(SIGHUP, &sa, NULL))
+    {
+        perror("sigaction()");
+        exit(EXIT_FAILURE);
+    }
+}
 
 int
 prepare_server()
@@ -67,6 +90,8 @@ prepare_server()
         exit(EXIT_FAILURE);
     }
 
+    setup_ipc();
+
     return sfd;
 }
 
@@ -91,7 +116,7 @@ run_server(int sfd)
     {
         work = cache;
         status = select(fdmax + 1, &work, NULL, NULL, NULL);
-        if(status)
+        if(status > 0)
         {
             for(i = 3; i <= fdmax; ++i)
             {
@@ -136,10 +161,21 @@ run_server(int sfd)
                 }
             }
         }
-        else
+        else if(-1 == status)
         {
-            perror("select()");
-            break;
+            if(errno == EINTR)
+            {
+                if(1 == is_reload_needed)
+                {
+                    printf("RELOAD NEEDED\n");
+                    is_reload_needed = 0;
+                }
+            }
+            else
+            {
+                perror("select()");
+                break;
+            }
         }
     }
     
