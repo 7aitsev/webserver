@@ -1,14 +1,15 @@
-#include <string.h> // for memset
+#include "handler.h"
+#include "server.h"
+
+#include <errno.h>
+#include <netdb.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h> // for memset
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netdb.h>
 #include <unistd.h>
-
-#include "handler.h"
-#include "server.h"
 
 #define BACKLOG_SIZE 3
 

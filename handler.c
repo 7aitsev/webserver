@@ -1,12 +1,25 @@
+#include "config.h"
 #include "handler.h"
+
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 const char * const HTTP_METHOD_STRING[] = {
     "GET", "POST", "PUT", "DELETE", "CONNECT",
     "PATCH", "OPTIONS", "TRACE", "HEAD"
 };
+
 const char * const HTTP_VERSION_STRING[] = {
     "1.0", "1.1"
 };
+
 const char * const HTTP_STATUS_ALL[] = {
     "200", "OK",
     "400", "Bad Request",

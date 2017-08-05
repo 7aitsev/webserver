@@ -1,12 +1,12 @@
-#include <grp.h>
-#include <pwd.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
-
 #include "config.h"
 #include "server.h"
+
+#include <grp.h>
+#include <pwd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 uid_t
 get_uid_by_name(const char* uname)

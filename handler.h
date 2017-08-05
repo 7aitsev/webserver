@@ -1,19 +1,7 @@
 #ifndef HANDLER_H
 #define HANDLER_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <sys/types.h>
-#include <sys/socket.h>
-
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <unistd.h>
-
-#include "config.h"
+#include <stddef.h>
 
 #define DEF_BUF_SIZE 512
 #define URI_SIZE 256

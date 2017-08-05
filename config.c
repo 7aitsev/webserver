@@ -1,5 +1,8 @@
 #include "config.h"
 
+#include <getopt.h>
+#include <stdio.h>
+
 struct config CONFIG;
 
 void
