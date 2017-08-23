@@ -3,3 +3,5 @@
 3. Logger: do not write to stderr and stdout
 4. poll() insted of select()
 5. configuration file support
+6. implement HEAD req/resp
+7. O_NONBLOCK for the master socket (7.4 beej.us)

@@ -61,7 +61,7 @@ int sendall(int sfd, const char* data, size_t* dsize)
 
     while(total < *dsize)
     {
-        n = send(sfd, data+total, bytesleft, 0);
+        n = send(sfd, data+total, bytesleft, MSG_NOSIGNAL);
         if(-1 == n)
         {
             break;
@@ -168,6 +168,7 @@ parse_http_req(struct HTTP_REQ* http_req, const char* req)
     char v2 = 0;
 
     int n;
+    errno = 0;
     const char* fstr = "%8[A-Z] %m[-A-Za-z0-9./_] HTTP/%c.%c";
     if(4 == (n = sscanf(req, fstr, &method, &uri, &v1, &v2)))
     {
@@ -182,7 +183,7 @@ parse_http_req(struct HTTP_REQ* http_req, const char* req)
         }
         http_req->status = BAD_REQUEST;
     }
-    else if(0 == n)
+    else if(0 == n && 0 == errno)
     {
         fprintf(stderr, "No matching values\n");
         http_req->status = BAD_REQUEST;
@@ -206,7 +207,8 @@ do_http_get(int sfd, struct HTTP_REQ* http_req)
 
     char* path = strcmp(http_req->uri, "/")
             ? http_req->uri
-            : CONFIG.directory_index;
+            : CONFIG.index_page;
+printf("path = %s\n", path);
     fd = open(path, O_RDONLY);
     if(-1 != fd)
     {

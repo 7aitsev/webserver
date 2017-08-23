@@ -148,7 +148,8 @@ run_server(int sfd)
                     else
                     {
                         addr_size = sizeof(client);
-                        if(-1 != (cs = accept(sfd, (struct sockaddr*) &client, &addr_size)))
+                        if(-1 != (cs = accept(sfd, (struct sockaddr*) &client,
+                                        &addr_size)))
                         {
                             FD_SET(cs, &cache);
                             fdmax = (cs > fdmax) ? cs : fdmax;
@@ -164,13 +165,10 @@ run_server(int sfd)
         }
         else if(-1 == status)
         {
-            if(errno == EINTR)
+            if(errno == EINTR && 1 == is_reload_needed)
             {
-                if(1 == is_reload_needed)
-                {
-                    printf("RELOAD NEEDED\n");
-                    is_reload_needed = 0;
-                }
+                printf("RELOAD NEEDED\n");
+                is_reload_needed = 0;
             }
             else
             {
