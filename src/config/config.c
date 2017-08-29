@@ -1,4 +1,5 @@
-#include "config.h"
+#include "config/config.h"
+#include "config/conf.h"
 
 #include <errno.h>
 #include <getopt.h>
@@ -6,31 +7,31 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct config CONFIG;
+struct conf g_conf;
 
-int
+static int
 allocopts()
 {
-    CONFIG.opts = malloc(10 * sizeof(char*) + 10 * 257);
-    if(NULL != CONFIG.opts)
+    g_conf.opts = malloc(10 * sizeof(char*) + 10 * 257);
+    if(NULL != g_conf.opts)
     {
         int i = 0;
-        char *offset = (char*) &CONFIG.opts[10];
+        char *offset = (char*) &g_conf.opts[10];
         for(; i < 10; ++i, offset += 257)
         {
-            CONFIG.opts[i] = offset;
+            g_conf.opts[i] = offset;
         }
-        strcpy(CONFIG.opts[0], "./webserver");
+        strcpy(g_conf.opts[0], "./webserver");
         return 0;
     }
     else
     {
-        perror("malloc for CONFIG.opts failed");
+        perror("malloc for g_conf.opts failed");
         return -1;
     }
 }
 
-int
+static int
 readargs(const char* fline, int * const nopt)
 {
     char param[16]; // 15+1
@@ -47,8 +48,8 @@ readargs(const char* fline, int * const nopt)
             fprintf(stderr, "Parameter in the config is invalid\n");
             return -1;
         }
-        sprintf(CONFIG.opts[++(*nopt)], "--%s", param);
-        strcpy(CONFIG.opts[++(*nopt)], arg);
+        sprintf(g_conf.opts[++(*nopt)], "--%s", param);
+        strcpy(g_conf.opts[++(*nopt)], arg);
     }
     else if(0 <= rv && 0 == errno)
     {
@@ -64,7 +65,7 @@ readargs(const char* fline, int * const nopt)
     return 0;
 }
 
-int
+static int
 loadconfig()
 {
     int error;
@@ -72,7 +73,7 @@ loadconfig()
     size_t maxlen = 300;
     char fline[maxlen];
 
-    FILE* cfile = fopen(CONFIG.config_file, "r");
+    FILE* cfile = fopen(g_conf.config_file, "r");
     if(NULL == cfile)
     {
         perror("Could not open the configuration file");
@@ -96,11 +97,11 @@ loadconfig()
         return -1;
     }
 
-    CONFIG.opts[++nopt] = NULL;
-    return configure(nopt, CONFIG.opts);
+    g_conf.opts[++nopt] = NULL;
+    return cfgmngr(nopt, g_conf.opts);
 }
 
-void
+static void
 printhelp()
 {
     printf(
@@ -122,27 +123,14 @@ printhelp()
 }
 
 int
-init_server(int argc, char** argv)
+recfgmngr()
 {
-    CONFIG.config_file = NULL;
-    CONFIG.index_page = NULL;
-    CONFIG.document_root = NULL;
-    CONFIG.user = NULL;
-    CONFIG.group = NULL;
-    CONFIG.opts = NULL;
-    
-    return configure(argc, argv);
-}
-
-int
-reconfigure_server()
-{
-    if(NULL != CONFIG.opts)
+    if(NULL != g_conf.opts)
     {
-        free(CONFIG.opts);
-        CONFIG.opts = NULL;
+        free(g_conf.opts);
+        g_conf.opts = NULL;
     }
-    if(NULL == CONFIG.config_file)
+    if(NULL == g_conf.config_file)
     {
         fprintf(stderr,
                 "Reconfiguration has been requested, but no path "
@@ -150,16 +138,17 @@ reconfigure_server()
                );
         return -1;
     }
-    CONFIG.index_page = NULL;
-    CONFIG.document_root = NULL;
-    CONFIG.user = NULL;
-    CONFIG.group = NULL;
+    g_conf.index_page = NULL;
+    g_conf.document_root = NULL;
+    g_conf.user = NULL;
+    g_conf.group = NULL;
 
+    optind = 1;
     return loadconfig();
 }
 
 int
-configure(int argc, char** argv)
+cfgmngr(int argc, char** argv)
 {
     char reload = 0;
 
@@ -170,7 +159,7 @@ configure(int argc, char** argv)
         {"group", required_argument, NULL, 'g'}, 
         {"help", no_argument, NULL, 'h'},
         {"version", no_argument, NULL, 'v'},
-        {0}
+        {NULL}
     };
 
     int opt;
@@ -179,20 +168,20 @@ configure(int argc, char** argv)
         switch(opt)
         {
             case 'r':
-                if(NULL == CONFIG.document_root)
-                    CONFIG.document_root = optarg;
+                if(NULL == g_conf.document_root)
+                    g_conf.document_root = optarg;
                 break;
             case 'i':
-                if(NULL == CONFIG.index_page)
-                    CONFIG.index_page = optarg;
+                if(NULL == g_conf.index_page)
+                    g_conf.index_page = optarg;
                 break;
             case 'u':
-                if(NULL == CONFIG.user)
-                    CONFIG.user = optarg;
+                if(NULL == g_conf.user)
+                    g_conf.user = optarg;
                 break;
             case 'g':
-                if(NULL == CONFIG.group)
-                    CONFIG.group = optarg;
+                if(NULL == g_conf.group)
+                    g_conf.group = optarg;
                 break;
             case 'v':
                 printf("WebServer %s\n", WEB_SERVER_VERSION);
@@ -206,25 +195,25 @@ configure(int argc, char** argv)
 
     if(optind < argc)
     {
-        CONFIG.config_file = argv[optind++];
+        g_conf.config_file = argv[optind++];
         reload = 1;
         optind = 1;
     }
 
-    if(NULL == CONFIG.document_root && 0 == reload)
+    if(NULL == g_conf.document_root && 0 == reload)
     {
         fprintf(stderr, "You have to specify the document-root parameter!\n");
         return -1;
     }
 
-    if(NULL == CONFIG.index_page && 0 == reload)
+    if(NULL == g_conf.index_page && 0 == reload)
     {
-        CONFIG.index_page = INDEX_PAGE;
+        g_conf.index_page = INDEX_PAGE;
     }
 
-    if((NULL == CONFIG.user || NULL == CONFIG.group) && 0 == reload)
+    if((NULL == g_conf.user || NULL == g_conf.group) && 0 == reload)
     {
-        if(CONFIG.user != CONFIG.group)
+        if(g_conf.user != g_conf.group)
         {
             printf("You have provided either --user or --group,"
                     "but you should use them both\n");
@@ -236,4 +225,31 @@ configure(int argc, char** argv)
     }
 
     return (1 == reload) ? loadconfig() : 0;
+}
+
+int
+cfgserv(int argc, char** argv)
+{
+    int opt;
+    const struct option lopts[] = {
+       {"index-page", required_argument, NULL, 'i'},
+       {NULL}
+    };
+
+    while(-1 != (opt = getopt_long(argc, argv, "i:", lopts, NULL)))
+    {
+        switch(opt)
+        {
+            case 'i':
+                g_conf.index_page = optarg;
+                break;
+            default:
+                return -1;
+        }
+    }
+
+    if(NULL == g_conf.index_page)
+        return -1;
+
+    return 0;
 }

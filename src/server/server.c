@@ -1,41 +1,116 @@
-#include "handler.h"
-#include "server.h"
+#include "config/config.h"
+#include "server/handler.h"
 
 #include <errno.h>
+#include <fcntl.h>
+#include <grp.h>
+#include <pwd.h>
 #include <netdb.h>
+#include <semaphore.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h> // for memset
+#include <sys/stat.h> 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 #define BACKLOG_SIZE 3
 
-volatile sig_atomic_t is_reload_needed = 0;
+struct perms {
+    uid_t p_uid;
+    gid_t p_gid;
+};
 
-void
-reload_config(int sig)
+static sem_t* g_sem;
+
+/** Config for the whole program */
+extern struct conf g_conf;
+
+static volatile sig_atomic_t g_nsig = 0;
+
+static void
+reload_config(int nsig)
 {
-    is_reload_needed = 1;
+    g_nsig = nsig;
 }
 
-void
-setup_ipc()
+static struct perms
+get_perms()
 {
-    struct sigaction sa;
-    sa.sa_handler = reload_config;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    if(-1 == sigaction(SIGHUP, &sa, NULL))
+    struct passwd* p;
+    struct group* g;
+
+    if(NULL == (p = getpwnam(g_conf.user)))
     {
-        perror("sigaction()");
+        perror("getpwnam()");
+        exit(EXIT_FAILURE);
+    }
+    if(NULL == (g = getgrnam(g_conf.group)))
+    {
+        perror("getgrnam()");
+        exit(EXIT_FAILURE);
+    }
+
+    return (struct perms) {p->pw_uid, g->gr_gid};
+}
+
+static void
+drop_privileges(uid_t uid, gid_t gid)
+{
+    if(-1 == setgid(gid))
+    {
+        perror("[server] setgid()");
+        exit(EXIT_FAILURE);
+    }
+    if(-1 == setuid(uid))
+    {
+        perror("[server] setuid()");
         exit(EXIT_FAILURE);
     }
 }
 
-int
+static void
+setsigmask()
+{
+    sigset_t mask;
+    sigfillset(&mask);
+    sigdelset(&mask, SIGFPE);
+    sigdelset(&mask, SIGILL);
+    sigdelset(&mask, SIGSEGV);
+    sigdelset(&mask, SIGCONT);
+    sigdelset(&mask, SIGHUP);
+    sigdelset(&mask, SIGINT);
+    sigdelset(&mask, SIGTERM);
+    sigprocmask(SIG_SETMASK, &mask, NULL);
+}
+
+static void
+setup_ipc()
+{
+    struct sigaction sa, sadfl;
+    
+    setsigmask();
+
+    sa.sa_handler = reload_config;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    sigaction(SIGHUP, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+
+    sadfl.sa_handler = SIG_DFL;
+    sigaction(SIGCHLD, &sadfl, NULL);
+
+    g_sem = sem_open("/webserver.sem", O_RDWR);
+    if(SEM_FAILED == g_sem)
+    {
+        perror("[server] sem_open");
+    }
+}
+
+static int
 prepare_server()
 {
     int status;
@@ -43,7 +118,7 @@ prepare_server()
     struct addrinfo* servinfo;
     struct addrinfo* p;
     int sfd;
-    
+
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
@@ -91,12 +166,10 @@ prepare_server()
         exit(EXIT_FAILURE);
     }
 
-    setup_ipc();
-
     return sfd;
 }
 
-int
+static int
 run_server(int sfd)
 {
     int i;
@@ -165,10 +238,20 @@ run_server(int sfd)
         }
         else if(-1 == status)
         {
-            if(errno == EINTR && 1 == is_reload_needed)
+            if(errno == EINTR && 0 != g_nsig)
             {
-                printf("RELOAD NEEDED\n");
-                is_reload_needed = 0;
+                if(SEM_FAILED != g_sem && SIGHUP == g_nsig)
+                {
+                    printf("[server] Reload requested\n");
+                    sem_post(g_sem);
+                }
+                else
+                {
+                    printf("[server] Normal termination\n");
+                }
+                shutdown(sfd, SHUT_RDWR);
+                FD_CLR(sfd, &cache);
+                break;
             }
             else
             {
@@ -178,5 +261,41 @@ run_server(int sfd)
         }
     }
     
+    printf("[server] Finished\n");
     return 0;
 }
+
+int
+runservinproc()
+{   
+    pid_t servpid = fork();
+    if(0 == servpid)
+    {
+        int rv;
+        struct perms p = get_perms();
+        int listensocket = prepare_server();
+        (void) setup_ipc();
+        if(-1 == chroot(g_conf.document_root))
+        {
+            perror("[server] chroot()");
+            exit(EXIT_FAILURE);
+        }
+        (void) drop_privileges(p.p_uid, p.p_gid);
+
+        rv = run_server(listensocket);
+        exit(rv);
+    }
+    return servpid;
+}
+
+/*int
+main(int argc, char** argv)
+{
+    int rv;
+    if(0 == (rv = cfgserv(argc, argv, &g_sconf)))
+    {
+        int sfd = prepare_server();
+        run_server(sfd);
+    }
+    return rv;
+}*/

@@ -1,5 +1,5 @@
-#include "config.h"
-#include "handler.h"
+#include "config/conf.h"
+#include "server/handler.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -10,6 +10,9 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+/** Config for the whole program */
+extern struct conf g_conf;
 
 const char * const HTTP_METHOD_STRING[] = {
     "GET", "POST", "PUT", "DELETE", "CONNECT",
@@ -207,7 +210,7 @@ do_http_get(int sfd, struct HTTP_REQ* http_req)
 
     char* path = strcmp(http_req->uri, "/")
             ? http_req->uri
-            : CONFIG.index_page;
+            : g_conf.index_page;
 printf("path = %s\n", path);
     fd = open(path, O_RDONLY);
     if(-1 != fd)

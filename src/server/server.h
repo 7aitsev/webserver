@@ -2,9 +2,6 @@
 #define SERVER_H
 
 int
-prepare_server();
-
-int
-run_server(int sfd);
+runservinproc();
 
 #endif
