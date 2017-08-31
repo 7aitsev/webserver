@@ -7,3 +7,4 @@
 6. Implement HEAD req/resp
 7. O_NONBLOCK for the master socket (7.4 beej.us)
 --8. Daemonization--
+9. _exit() instead of exit()

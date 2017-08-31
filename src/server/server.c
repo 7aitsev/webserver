@@ -45,12 +45,12 @@ get_perms()
     if(NULL == (p = getpwnam(g_conf.user)))
     {
         perror("getpwnam()");
-        exit(EXIT_FAILURE);
+        _exit(EXIT_FAILURE);
     }
     if(NULL == (g = getgrnam(g_conf.group)))
     {
         perror("getgrnam()");
-        exit(EXIT_FAILURE);
+        _exit(EXIT_FAILURE);
     }
 
     return (struct perms) {p->pw_uid, g->gr_gid};
@@ -62,12 +62,12 @@ drop_privileges(uid_t uid, gid_t gid)
     if(-1 == setgid(gid))
     {
         perror("[server] setgid()");
-        exit(EXIT_FAILURE);
+        _exit(EXIT_FAILURE);
     }
     if(-1 == setuid(uid))
     {
         perror("[server] setuid()");
-        exit(EXIT_FAILURE);
+        _exit(EXIT_FAILURE);
     }
 }
 
@@ -128,7 +128,7 @@ prepare_server()
     if(0 != (status = getaddrinfo(NULL, "http", &hints, &servinfo)))
     {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
-        exit(EXIT_FAILURE);
+        _exit(EXIT_FAILURE);
     }
 
     int yes = 1;
@@ -141,7 +141,7 @@ prepare_server()
 
         if(-1 == setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))) {
             perror("setsockopt");
-            exit(EXIT_FAILURE);
+            _exit(EXIT_FAILURE);
         }
 
         if(0 == bind(sfd, p->ai_addr, p->ai_addrlen))
@@ -155,7 +155,7 @@ prepare_server()
     if(p == NULL)
     {
         fprintf(stderr, "Could not bind\n");
-        exit(EXIT_FAILURE);
+        _exit(EXIT_FAILURE);
     }
 
     freeaddrinfo(servinfo);
@@ -163,7 +163,7 @@ prepare_server()
     if(-1 == listen(sfd, BACKLOG_SIZE))
     {
         perror("listen");
-        exit(EXIT_FAILURE);
+        _exit(EXIT_FAILURE);
     }
 
     return sfd;
@@ -278,12 +278,12 @@ runservinproc()
         if(-1 == chroot(g_conf.document_root))
         {
             perror("[server] chroot()");
-            exit(EXIT_FAILURE);
+            _exit(EXIT_FAILURE);
         }
         (void) drop_privileges(p.p_uid, p.p_gid);
 
         rv = run_server(listensocket);
-        exit(rv);
+        _exit(rv);
     }
     return servpid;
 }

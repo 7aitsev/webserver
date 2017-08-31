@@ -1,5 +1,5 @@
-#ifndef MNGRCONF_H
-#define MNGRCONF_H
+#ifndef CONF_H
+#define CONF_H
 
 struct conf
 {
