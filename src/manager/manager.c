@@ -257,7 +257,7 @@ daemonize()
         exit(EXIT_FAILURE);
     }
     fdlog = open("/tmp/webserver.log",
-            O_RDWR | O_CREAT | O_APPEND, 0644);
+            O_RDWR | O_CREAT | O_TRUNC, 0644);
     if(fdlog == -1)
     {
         perror("[manager] Failed to open logfile");
@@ -302,7 +302,7 @@ manage(int argc, char** argv)
         else
         {
             fprintf(stderr, "[manager] isRunning == false\n");
-            sem_unlink("/webserver.sem");
+            sem_close(g_sem);
             break;
         }
     }

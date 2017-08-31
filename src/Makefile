@@ -21,7 +21,7 @@ MNGRDEPS = $(CFGDIR)/conf.h
 #_SERVOBJ = config.o handler.o server.o
 #SERVOBJ = $(patsubst %, $(OBJDIR)/%, $(_SERVOBJ))
 
-_MNGROBJ = config.o handler.o server.o manager.o main.o
+_MNGROBJ = config.o handler.o worker.o server.o manager.o main.o
 MNGROBJ = $(patsubst %, $(OBJDIR)/%, $(_MNGROBJ))
 
 # Match targets in SRCDIR

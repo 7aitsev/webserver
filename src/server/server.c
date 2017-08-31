@@ -1,5 +1,5 @@
 #include "config/config.h"
-#include "server/handler.h"
+#include "server/worker.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -31,7 +31,7 @@ extern struct conf g_conf;
 static volatile sig_atomic_t g_nsig = 0;
 
 static void
-reload_config(int nsig)
+sig_reload_config(int nsig)
 {
     g_nsig = nsig;
 }
@@ -83,6 +83,7 @@ setsigmask()
     sigdelset(&mask, SIGHUP);
     sigdelset(&mask, SIGINT);
     sigdelset(&mask, SIGTERM);
+    sigdelset(&mask, SIGCHLD);
     sigprocmask(SIG_SETMASK, &mask, NULL);
 }
 
@@ -93,15 +94,14 @@ setup_ipc()
     
     setsigmask();
 
-    sa.sa_handler = reload_config;
+    sa.sa_handler = sig_reload_config;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
     sigaction(SIGHUP, &sa, NULL);
-    sigaction(SIGINT, &sa, NULL);
-    sigaction(SIGTERM, &sa, NULL);
 
     sadfl.sa_handler = SIG_DFL;
     sigaction(SIGCHLD, &sadfl, NULL);
+    sigaction(SIGINT, &sadfl, NULL);
+    sigaction(SIGTERM, &sadfl, NULL);
 
     g_sem = sem_open("/webserver.sem", O_RDWR);
     if(SEM_FAILED == g_sem)
@@ -170,111 +170,65 @@ prepare_server()
 }
 
 static int
-run_server(int sfd)
+run_server(int master)
 {
-    int i;
-    int status;
-    int fdmax = sfd;
-    fd_set cache;
-    fd_set work;
+    int slave;
     struct sockaddr_storage client;
     socklen_t addr_size = sizeof(client);
-    int cs;
-    int bytes;
-    char buf[1024];
 
-    FD_ZERO(&cache);
-    FD_SET(sfd, &cache);
- 
     while(1)
     {
-        work = cache;
-        status = select(fdmax + 1, &work, NULL, NULL, NULL);
-        if(status > 0)
+        slave = accept(master, (struct sockaddr*) &client, &addr_size);
+        if(-1 != slave)
         {
-            for(i = 3; i <= fdmax; ++i)
+            printf("[server] new client: %d\n", slave);
+            worker_fd_pass(slave);
+            close(slave);
+        }
+        else
+        {
+            if(EINTR != errno)
             {
-                if(FD_ISSET(i, &work))
-                {
-                    if(i != sfd)
-                    {
-                        if(0 < (bytes = recv(i, (void*) buf, 1024, 0)))
-                        {
-                            make_response(i, buf);
-                            close(i);
-                            FD_CLR(i, &cache);
-                        }
-                        else
-                        {
-                            if(bytes == 0)
-                            {
-                                printf("socket %d hung up\n", i);
-                            }
-                            else
-                            {
-                                perror("recv()");
-                            }
-                            close(i);
-                            FD_CLR(i, &cache);
-                        }
-                    }
-                    else
-                    {
-                        addr_size = sizeof(client);
-                        if(-1 != (cs = accept(sfd, (struct sockaddr*) &client,
-                                        &addr_size)))
-                        {
-                            FD_SET(cs, &cache);
-                            fdmax = (cs > fdmax) ? cs : fdmax;
-                            printf("new client: %d\n", cs);
-                        }
-                        else
-                        {
-                            perror("accept()");
-                        }
-                    }
-                }
+                perror("[server] accept()");
+                return EXIT_FAILURE;
             }
         }
-        else if(-1 == status)
+
+        if(0 != g_nsig)
         {
-            if(errno == EINTR && 0 != g_nsig)
+            if(SEM_FAILED != g_sem)
             {
-                if(SEM_FAILED != g_sem && SIGHUP == g_nsig)
-                {
-                    printf("[server] Reload requested\n");
-                    sem_post(g_sem);
-                }
-                else
-                {
-                    printf("[server] Normal termination\n");
-                }
-                shutdown(sfd, SHUT_RDWR);
-                FD_CLR(sfd, &cache);
+                printf("[server] Reload requested\n");
+                sem_post(g_sem);
                 break;
             }
-            else
-            {
-                perror("select()");
-                break;
-            }
+        }
+        else if(is_reaping_needed())
+        {
+            printf("[server] Termination requested\n");
+            break;
+        }
+        else if(is_respawn_needed())
+        {
+            printf("[server] Respawn a worker\n");
+            respawn_worker();
         }
     }
-    
-    printf("[server] Finished\n");
-    return 0;
+
+    shutdown(master, SHUT_RDWR);
+    return EXIT_SUCCESS;
 }
 
 int
 runservinproc()
-{   
+{
     pid_t servpid = fork();
     if(0 == servpid)
     {
         int rv;
+        (void) setup_ipc();
         struct perms p = get_perms();
         int listensocket = prepare_server();
-        (void) setup_ipc();
         if(-1 == chroot(g_conf.document_root))
         {
             perror("[server] chroot()");
@@ -282,7 +236,9 @@ runservinproc()
         }
         (void) drop_privileges(p.p_uid, p.p_gid);
 
+        init_workers();
         rv = run_server(listensocket);
+        reap_workers();
         _exit(rv);
     }
     return servpid;
