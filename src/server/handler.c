@@ -126,6 +126,21 @@ put_http_header(char* buf, const struct HTTP_REQ* http_req,
     return strlen(buf);
 }
 
+void
+get_rid_of_cgi(char* uri)
+{
+    int i;
+    for(i = 0; i < URI_SIZE; ++i)
+    {
+        if('?' == *uri)
+        {
+            *uri = '\0';
+            break;
+        }
+        uri++;
+    }
+}
+
 int
 fill_http_req(struct HTTP_REQ* http_req, const char* method,
         char* uri, char v1, char v2)
@@ -149,6 +164,8 @@ fill_http_req(struct HTTP_REQ* http_req, const char* method,
     http_req->method = http_method;
     http_req->version = http_version;
 
+    get_rid_of_cgi(uri);
+    memset(http_req->uri, 0, sizeof(http_req->uri));
     strncpy(http_req->uri, uri, URI_SIZE);
     if(http_req->uri[URI_SIZE - 1] != '\0')
     {
@@ -172,7 +189,7 @@ parse_http_req(struct HTTP_REQ* http_req, const char* req)
 
     int n;
     errno = 0;
-    const char* fstr = "%8[A-Z] %m[-A-Za-z0-9./_] HTTP/%c.%c";
+    const char* fstr = "%8[A-Z] %m[-A-Za-z0-9./_~:#@!$'()*+,;?=] HTTP/%c.%c";
     if(4 == (n = sscanf(req, fstr, &method, &uri, &v1, &v2)))
     {
         return fill_http_req(http_req, method, uri, v1, v2);

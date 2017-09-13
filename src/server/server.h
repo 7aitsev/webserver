@@ -4,4 +4,7 @@
 int
 runservinproc();
 
+void
+daemonize();
+
 #endif

@@ -44,13 +44,13 @@ get_perms()
 
     if(NULL == (p = getpwnam(g_conf.user)))
     {
-        perror("getpwnam()");
-        _exit(EXIT_FAILURE);
+        perror("[server] getpwnam()");
+        p->pw_uid = 0;
     }
     if(NULL == (g = getgrnam(g_conf.group)))
     {
-        perror("getgrnam()");
-        _exit(EXIT_FAILURE);
+        perror("[server] getgrnam()");
+        g->gr_gid = 0;
     }
 
     return (struct perms) {p->pw_uid, g->gr_gid};
@@ -59,12 +59,12 @@ get_perms()
 static void
 drop_privileges(uid_t uid, gid_t gid)
 {
-    if(-1 == setgid(gid))
+    if(0 != uid && -1 == setgid(gid))
     {
         perror("[server] setgid()");
         _exit(EXIT_FAILURE);
     }
-    if(-1 == setuid(uid))
+    if(0 != gid && -1 == setuid(uid))
     {
         perror("[server] setuid()");
         _exit(EXIT_FAILURE);
@@ -114,6 +114,8 @@ static int
 prepare_server()
 {
     int status;
+    char* port = g_conf.port;
+    char* host = g_conf.host;
     struct addrinfo hints;
     struct addrinfo* servinfo;
     struct addrinfo* p;
@@ -125,7 +127,7 @@ prepare_server()
     hints.ai_flags = AI_PASSIVE;
     hints.ai_protocol = IPPROTO_TCP;
 
-    if(0 != (status = getaddrinfo(NULL, "http", &hints, &servinfo)))
+    if(0 != (status = getaddrinfo(host, port, &hints, &servinfo)))
     {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
         _exit(EXIT_FAILURE);
@@ -154,7 +156,7 @@ prepare_server()
 
     if(p == NULL)
     {
-        fprintf(stderr, "Could not bind\n");
+        fprintf(stderr, "[server] Could not bind\n");
         _exit(EXIT_FAILURE);
     }
 
@@ -243,15 +245,58 @@ runservinproc()
     }
     return servpid;
 }
-
-/*int
-main(int argc, char** argv)
+    
+void
+daemonize()
 {
-    int rv;
-    if(0 == (rv = cfgserv(argc, argv, &g_sconf)))
+    int fdlog;
+    pid_t pid = fork();
+    if(-1 == pid)
     {
-        int sfd = prepare_server();
-        run_server(sfd);
+        perror("[server] The first fork() failed");
+        exit(EXIT_FAILURE);
     }
-    return rv;
-}*/
+    else if(0 != pid)
+    {
+        _exit(EXIT_SUCCESS);
+    }
+
+    setsid();
+
+    pid = fork();
+    if(-1 == pid)
+    {
+        perror("[server] The second fork() failed");
+        exit(EXIT_FAILURE);
+    }
+    else if(0 != pid)
+    {
+        _exit(EXIT_SUCCESS);
+    }
+
+    if(-1 == chdir("/"))
+    {
+        perror("[server] Chdir failed");
+        exit(EXIT_FAILURE);
+    }
+
+    umask(0);
+
+    close(STDIN_FILENO);
+    if(-1 == open("/dev/null", O_RDONLY))
+    {
+        perror("[server] Open /dev/null failed");
+        exit(EXIT_FAILURE);
+    }
+    fdlog = open(g_conf.log_path, O_RDWR | O_CREAT | O_TRUNC, 0644);
+    if(fdlog == -1)
+    {
+        fprintf(stderr, "[server] Failed to open logfile: %s\n\t",
+                    g_conf.log_path);
+        perror("");
+    }
+    dup2(fdlog, STDOUT_FILENO);
+    dup2(fdlog, STDERR_FILENO);
+    close(fdlog);
+    setvbuf(stdout, NULL, _IONBF, 0);
+}

@@ -16,10 +16,10 @@ CFLAGS = -Wall -I$(SRCDIR) -g
 
 #SOURCES := $(shell find $(SRCDIR) -name '*.c')
 #SERVDEPS = $(CFGDIR)/servconf.h
-MNGRDEPS = $(CFGDIR)/conf.h
+DEPS = $(CFGDIR)/conf.h
 
-#_SERVOBJ = config.o handler.o server.o
-#SERVOBJ = $(patsubst %, $(OBJDIR)/%, $(_SERVOBJ))
+_SERVOBJ = handler.o worker.o server.o stepik.o
+SERVOBJ = $(patsubst %, $(OBJDIR)/%, $(_SERVOBJ))
 
 _MNGROBJ = config.o handler.o worker.o server.o manager.o main.o
 MNGROBJ = $(patsubst %, $(OBJDIR)/%, $(_MNGROBJ))
@@ -29,7 +29,7 @@ $(OBJDIR)/%.o: %.c
 	$(CC) $< -o $@ $(CFLAGS) -c
 
 # Match targets in CFGDIR
-$(OBJDIR)/%.o: $(CFGDIR)/%.c $(CFGDIR)/%.h $(MNGRDEPS)
+$(OBJDIR)/%.o: $(CFGDIR)/%.c $(CFGDIR)/%.h $(DEPS)
 	$(CC) $< -o $@ $(CFLAGS) -c
 
 # Match targets in SERVDIR
@@ -37,12 +37,16 @@ $(OBJDIR)/%.o: $(SERVDIR)/%.c $(SERVDIR)/%.h
 	$(CC) $< -o $@ $(CFLAGS) -c
 
 # Match targets in MNGRDIR
-$(OBJDIR)/%.o: $(MNGRDIR)/%.c $(MNGRDIR)/%.h $(MNGRDEPS)
+$(OBJDIR)/%.o: $(MNGRDIR)/%.c $(MNGRDIR)/%.h $(DEPS)
 	$(CC) $< -o $@ $(CFLAGS) -c
 
-#all: manager server
+$(OBJDIR)/%.o: $(SERVDIR)/%.c
+	$(CC) $< -o $@ $(CFLAGS) -c
 
 manager: $(MNGROBJ)
+	$(CC) $^ -o $(BINDIR)/$@ $(CFLAGS) -pthread
+
+server: $(SERVOBJ)
 	$(CC) $^ -o $(BINDIR)/$@ $(CFLAGS) -pthread
 
 #server: $(SERVOBJ)

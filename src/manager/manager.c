@@ -53,12 +53,12 @@ setupsem()
     if(SEM_FAILED != (g_sem = 
                 sem_open("/webserver.sem", O_CREAT | O_RDWR, 0666, 0)))
     {
-        return 0;
+        return EXIT_SUCCESS;
     }
     else
     {
-        perror("sem_open");
-        return -1;
+        perror("[manager] sem_open");
+        return EXIT_FAILURE;
     }
 }
 
@@ -68,12 +68,12 @@ setupipc()
     if(0 != setupsig())
     {
         fprintf(stderr, "[manager] Could not init signals\n");
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
     if(0 != setupsem())
     {
         fprintf(stderr, "[manager] Could not init a semaphore\n");
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -128,13 +128,13 @@ blockforsuspend(int how, sigset_t* set)
     if(SIG_BLOCK == how)
     {
         if(-1 == sigprocmask(SIG_SETMASK, &mask, &oldmask))
-            perror("sig_block");
+            perror("[manager] sig_block");
         *set = mask;
     }
     else
     {
         if(-1 == sigprocmask(SIG_SETMASK, &oldmask, NULL))
-            perror("sig_unblock");
+            perror("[manager] sig_unblock");
     }
 }
 
@@ -158,7 +158,6 @@ waitserver(pid_t servpid)
             case SIGCHLD:
                 if(-1 != (rv = sem_getvalue(g_sem, &val)))
                 {
-                    fprintf(stderr, "[manager] val == %d\n", val);
                     if(0 != val)
                     {
                         g_isRunning = 1;
@@ -214,60 +213,6 @@ create_webserver()
     }
 }
 
-void
-daemonize()
-{
-    int fdlog;
-    pid_t pid = fork();
-    if(-1 == pid)
-    {
-        perror("[manager] The first fork() failed");
-        exit(EXIT_FAILURE);
-    }
-    else if(0 != pid)
-    {
-        _exit(EXIT_SUCCESS);
-    }
-
-    setsid();
-
-    pid = fork();
-    if(-1 == pid)
-    {
-        perror("[manager] The second fork() failed");
-        exit(EXIT_FAILURE);
-    }
-    else if(0 != pid)
-    {
-        _exit(EXIT_SUCCESS);
-    }
-
-    if(-1 == chdir("/"))
-    {
-        perror("[manager] Chdir failed");
-        exit(EXIT_FAILURE);
-    }
-
-    umask(0);
-
-    close(STDIN_FILENO);
-    if(-1 == open("/dev/null",O_RDONLY))
-    {
-        perror("[manager] Open /dev/null failed");
-        exit(EXIT_FAILURE);
-    }
-    fdlog = open("/tmp/webserver.log",
-            O_RDWR | O_CREAT | O_TRUNC, 0644);
-    if(fdlog == -1)
-    {
-        perror("[manager] Failed to open logfile");
-    }
-    dup2(fdlog, STDOUT_FILENO);
-    dup2(fdlog, STDERR_FILENO);
-    close(fdlog);
-    setvbuf(stdout, NULL, _IONBF, 0);
-}
-
 int
 manage(int argc, char** argv)
 {
@@ -275,11 +220,16 @@ manage(int argc, char** argv)
     g_isRunning = 1;
     g_doReconfiguration = 0;
 
+    checkopts(argc, argv);
+
+
     if(0 != cfgmngr(argc, argv))
     {
         fprintf(stderr, "[manager] Initialization of the server failed\n");
-        return -1;
+        return EXIT_FAILURE;
     }
+
+    daemonize();
 
     blockhandledsignals();
     setupipc();
@@ -290,10 +240,10 @@ manage(int argc, char** argv)
         {
             if(1 == g_doReconfiguration)
             {
-                if(-1 == recfgmngr())
+                if(0 != recfgmngr())
                 {
                     fprintf(stderr, "[manager] Reconfiguration failed\n");
-                    return -1;
+                    return EXIT_FAILURE;
                 }
                 g_doReconfiguration = 0;
             }
@@ -307,5 +257,5 @@ manage(int argc, char** argv)
         }
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
