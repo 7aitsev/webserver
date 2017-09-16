@@ -16,7 +16,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define BACKLOG_SIZE 3
+#define BACKLOG_SIZE 4
 
 struct perms {
     uid_t p_uid;
@@ -94,17 +94,18 @@ setup_ipc()
     
     setsigmask();
 
+    memset(&sa, 0, sizeof(sa));
     sa.sa_handler = sig_reload_config;
     sigemptyset(&sa.sa_mask);
     sigaction(SIGHUP, &sa, NULL);
 
+    memset(&sa, 0, sizeof(sadfl));
     sadfl.sa_handler = SIG_DFL;
     sigaction(SIGCHLD, &sadfl, NULL);
     sigaction(SIGINT, &sadfl, NULL);
     sigaction(SIGTERM, &sadfl, NULL);
 
-    g_sem = sem_open("/webserver.sem", O_RDWR);
-    if(SEM_FAILED == g_sem)
+    if(SEM_FAILED == (g_sem = sem_open("/webserver.sem", O_RDWR)))
     {
         perror("[server] sem_open");
     }
@@ -129,7 +130,7 @@ prepare_server()
 
     if(0 != (status = getaddrinfo(host, port, &hints, &servinfo)))
     {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
+        fprintf(stderr, "[server] getaddrinfo: %s\n", gai_strerror(status));
         _exit(EXIT_FAILURE);
     }
 
@@ -142,7 +143,7 @@ prepare_server()
         }
 
         if(-1 == setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))) {
-            perror("setsockopt");
+            perror("[server] setsockopt");
             _exit(EXIT_FAILURE);
         }
 
@@ -156,7 +157,7 @@ prepare_server()
 
     if(p == NULL)
     {
-        fprintf(stderr, "[server] Could not bind\n");
+        perror("[server] Could not bind");
         _exit(EXIT_FAILURE);
     }
 
@@ -164,7 +165,7 @@ prepare_server()
 
     if(-1 == listen(sfd, BACKLOG_SIZE))
     {
-        perror("listen");
+        perror("[server] listen");
         _exit(EXIT_FAILURE);
     }
 
@@ -192,7 +193,7 @@ run_server(int master)
             if(EINTR != errno)
             {
                 perror("[server] accept()");
-                return EXIT_FAILURE;
+                return -1;
             }
         }
 
@@ -218,7 +219,7 @@ run_server(int master)
     }
 
     shutdown(master, SHUT_RDWR);
-    return EXIT_SUCCESS;
+    return 0;
 }
 
 int
@@ -228,7 +229,7 @@ runservinproc()
     if(0 == servpid)
     {
         int rv;
-        (void) setup_ipc();
+        setup_ipc();
         struct perms p = get_perms();
         int listensocket = prepare_server();
         if(-1 == chroot(g_conf.document_root))
@@ -236,7 +237,7 @@ runservinproc()
             perror("[server] chroot()");
             _exit(EXIT_FAILURE);
         }
-        (void) drop_privileges(p.p_uid, p.p_gid);
+        drop_privileges(p.p_uid, p.p_gid);
 
         init_workers();
         rv = run_server(listensocket);
@@ -250,8 +251,9 @@ void
 daemonize()
 {
     int fdlog;
-    pid_t pid = fork();
-    if(-1 == pid)
+    pid_t pid;
+
+    if(-1 == (pid = fork()))
     {
         perror("[server] The first fork() failed");
         exit(EXIT_FAILURE);
@@ -261,10 +263,13 @@ daemonize()
         _exit(EXIT_SUCCESS);
     }
 
-    setsid();
+    if((pid_t) -1 == setsid())
+    {
+        perror("[server] setsid failed");
+        exit(EXIT_FAILURE);
+    }
 
-    pid = fork();
-    if(-1 == pid)
+    if(-1 == (pid = fork()))
     {
         perror("[server] The second fork() failed");
         exit(EXIT_FAILURE);
@@ -283,12 +288,7 @@ daemonize()
     umask(0);
 
     close(STDIN_FILENO);
-    if(-1 == open("/dev/null", O_RDONLY))
-    {
-        perror("[server] Open /dev/null failed");
-        exit(EXIT_FAILURE);
-    }
-    fdlog = open(g_conf.log_path, O_RDWR | O_CREAT | O_TRUNC, 0644);
+    fdlog = open(g_conf.log_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if(fdlog == -1)
     {
         fprintf(stderr, "[server] Failed to open logfile: %s\n\t",

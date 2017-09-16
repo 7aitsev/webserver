@@ -7,6 +7,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -27,7 +28,6 @@ static void
 sig_handler(int nsig)
 {
     g_nsig = nsig;
-    printf("[bad idea!] #sig = %d\n", g_nsig);
 }
 
 static int
@@ -36,6 +36,7 @@ setupsig()
     int rv = 0;
     struct sigaction sa;
 
+    memset(&sa, 0, sizeof(sa));
     sa.sa_handler = sig_handler;
     sigemptyset(&sa.sa_mask);
 
@@ -53,12 +54,12 @@ setupsem()
     if(SEM_FAILED != (g_sem = 
                 sem_open("/webserver.sem", O_CREAT | O_RDWR, 0666, 0)))
     {
-        return EXIT_SUCCESS;
+        return 0;
     }
     else
     {
         perror("[manager] sem_open");
-        return EXIT_FAILURE;
+        return -1;
     }
 }
 
@@ -88,8 +89,8 @@ blockhandledsignals()
     sigaddset(&mask, SIGCHLD);
     sigprocmask(SIG_BLOCK, &mask, NULL);
 }
-
-/*static void
+/*
+static void
 printcurrsigmask()
 {
     sigset_t mask;
@@ -103,8 +104,8 @@ printcurrsigmask()
     }
 
     printf("%llx\n", set);
-}*/
-
+}
+*/
 static void
 blockforsuspend(int how, sigset_t* set)
 {
@@ -171,7 +172,8 @@ waitserver(pid_t servpid)
                 }
                 else
                 {
-                    fprintf(stderr, "[manager] sem_getvalue returned %d\n", rv);
+                    fprintf(stderr, 
+                            "[manager] sem_getvalue returned %d\n", rv);
                 }
                 break;
             case SIGHUP:
@@ -183,6 +185,7 @@ waitserver(pid_t servpid)
             case SIGINT:
                 g_isRunning = 0;
                 kill(servpid, SIGTERM);
+                break;
             default:
                 continue;
         }
@@ -220,13 +223,10 @@ manage(int argc, char** argv)
     g_isRunning = 1;
     g_doReconfiguration = 0;
 
-    checkopts(argc, argv);
-
-
     if(0 != cfgmngr(argc, argv))
     {
         fprintf(stderr, "[manager] Initialization of the server failed\n");
-        return EXIT_FAILURE;
+        return -1;
     }
 
     daemonize();
@@ -243,7 +243,7 @@ manage(int argc, char** argv)
                 if(0 != recfgmngr())
                 {
                     fprintf(stderr, "[manager] Reconfiguration failed\n");
-                    return EXIT_FAILURE;
+                    return -1;
                 }
                 g_doReconfiguration = 0;
             }
@@ -257,5 +257,5 @@ manage(int argc, char** argv)
         }
     }
 
-    return EXIT_SUCCESS;
+    return 0;
 }

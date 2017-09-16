@@ -62,7 +62,7 @@ int sendall(int sfd, const char* data, size_t* dsize)
     int bytesleft = *dsize;
     int n;
 
-    while(total < *dsize)
+    while((size_t) total < *dsize)
     {
         n = send(sfd, data+total, bytesleft, MSG_NOSIGNAL);
         if(-1 == n)
@@ -145,21 +145,24 @@ int
 fill_http_req(struct HTTP_REQ* http_req, const char* method,
         char* uri, char v1, char v2)
 {
+    int rv;
     enum HTTP_METHOD http_method;
     enum HTTP_VERSION http_version;
 
-    if(-1 == (http_method = isstrin(method, HTTP_METHOD_STRING, HEAD)))
+    if(-1 == (rv = isstrin(method, HTTP_METHOD_STRING, HEAD)))
     {
         http_req->status = BAD_REQUEST;
         return -1;
     }
+    http_method = (unsigned int) rv;
 
     const char version[] = {v1, '.', v2, '\0'};
-    if(-1 == (http_version = isstrin(version, HTTP_VERSION_STRING, V11)))
+    if(-1 == (rv = isstrin(version, HTTP_VERSION_STRING, V11)))
     {
         http_req->status = HTTP_VER;
         return -1;
     }
+    http_version = (unsigned int) rv;
 
     http_req->method = http_method;
     http_req->version = http_version;
@@ -228,7 +231,9 @@ do_http_get(int sfd, struct HTTP_REQ* http_req)
     char* path = strcmp(http_req->uri, "/")
             ? http_req->uri
             : g_conf.index_page;
-printf("path = %s\n", path);
+
+    printf("path = %s\n", path);
+
     fd = open(path, O_RDONLY);
     if(-1 != fd)
     {
@@ -308,7 +313,6 @@ error_http(int sfd, const struct HTTP_REQ* http_req)
             HTTP_STATUS_ALL[http_req->status + 1]);
     size = strlen(resp);
     sendall(sfd, resp, &size);
-    fprintf(stderr, "%s\n", resp);
 }
 
 void

@@ -3,14 +3,14 @@
 
 struct conf
 {
-    char* config_file;
-    char* index_page;
-    char* host;
-    char* port;
-    char* log_path;
     char* document_root;
+    char* index_page;
+    char* log_path;
+    char* port;
+    char* host;
     char* user;
     char* group;
+    char* config_file;
     char** opts;
 };
 
