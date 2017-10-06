@@ -8,3 +8,5 @@
 7. O_NONBLOCK for the master socket (7.4 beej.us)
 --8. Daemonization--
 9. _exit() instead of exit()
+10. Write to a log about defaults
+11. Use logger module from my telecom lab

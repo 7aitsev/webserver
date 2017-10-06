@@ -45,7 +45,7 @@ printhelp()
 "         - start the server and load config options from a file\n\n"
 "Options:\n"
 "-r, --document-root root    : Set a path to a web site directory\n"
-"-i, --index-page index      : Set a home page path (default is `%s`)\n"
+"-i, --index-page index      : Set a home page path\n"
 "-l                          : Do not use a log file\n"
 "--log log_path              : Set a path for a log file\n"
 "--port port                 : A port on which the server will listen\n"
