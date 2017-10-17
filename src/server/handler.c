@@ -193,7 +193,7 @@ parse_http_req(struct HTTP_REQ* http_req, const char* req)
     int n;
     errno = 0;
     const char* fstr = "%8[A-Z] %m[-A-Za-z0-9./_~:#@!$'()*+,;?=] HTTP/%c.%c";
-    if(4 == (n = sscanf(req, fstr, &method, &uri, &v1, &v2)))
+    if(4 == (n = sscanf(req, fstr, method, &uri, &v1, &v2)))
     {
         return fill_http_req(http_req, method, uri, v1, v2);
     }

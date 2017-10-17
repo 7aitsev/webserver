@@ -54,8 +54,7 @@ printhelp()
 "-g, --group group           : Change the group id of the process\n"
 "-h, --help                  : Print help (this message) and exit\n"
 "-v, --version               : Print version information and exit\n",
-            WEB_SERVER_VERSION,
-            DEF_INDEX_PAGE
+            WEB_SERVER_VERSION
         );
 }
 
